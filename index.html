@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AES-256-GCM 加密</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "SF Pro Text", "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: #0d1117;
+    color: #c9d1d9;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding: 20px 16px 16px;
+    gap: 14px;
+  }
+
+  header { text-align: center; padding: 4px 0 8px; }
+  header h1 {
+    font-size: 18px;
+    color: #58a6ff;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  header p {
+    font-size: 12px;
+    color: #6e7681;
+    margin-top: 4px;
+  }
+
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 0 2px;
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #8b949e;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-title .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #58a6ff;
+  }
+  .card-title .dot.green { background: #3fb950; }
+  .char-count {
+    font-size: 11px;
+    color: #6e7681;
+    font-variant-numeric: tabular-nums;
+  }
+  .mini-btn {
+    background: transparent;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mini-btn:active { background: #21262d; color: #58a6ff; border-color: #58a6ff; }
+
+  textarea {
+    width: 100%;
+    flex: 1;
+    min-height: 90px;
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    color: #c9d1d9;
+    padding: 12px 14px;
+    font-family: "SF Mono", "Menlo", Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.55;
+    resize: none;
+    -webkit-user-select: text;
+    user-select: text;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  textarea:focus {
+    outline: none;
+    border-color: #58a6ff;
+    box-shadow: 0 0 0 3px #1f6feb22;
+  }
+  textarea::placeholder { color: #484f58; }
+  textarea[readonly] { background: #0a0d11; }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr 0.8fr;
+    gap: 8px;
+  }
+  .btn {
+    padding: 14px 8px;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    background: #21262d;
+    color: #c9d1d9;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: all 0.15s;
+    -webkit-user-select: none;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.5; pointer-events: none; }
+  .btn.primary {
+    background: linear-gradient(135deg, #238636, #2ea043);
+    border-color: #2ea043;
+    color: #fff;
+  }
+  .btn.secondary {
+    background: linear-gradient(135deg, #1f6feb, #388bfd);
+    border-color: #388bfd;
+    color: #fff;
+  }
+  .btn.ghost {
+    background: transparent;
+    color: #8b949e;
+  }
+  .btn.ghost:active { background: #21262d; color: #f85149; border-color: #f85149; }
+
+  #status {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    text-align: center;
+    display: none;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  #status.show { display: block; }
+  #status.ok { background: #23863622; border: 1px solid #2ea04366; color: #3fb950; }
+  #status.err { background: #da363322; border: 1px solid #f8514966; color: #f85149; }
+  #status.info { background: #1f6feb22; border: 1px solid #1f6feb66; color: #58a6ff; }
+
+  footer {
+    text-align: center;
+    font-size: 11px;
+    color: #484f58;
+    padding: 4px 0;
+  }
+
+  @media (min-width: 768px) {
+    body { padding: 32px; max-width: 720px; margin: 0 auto; }
+    textarea { min-height: 140px; }
+    .btn { padding: 12px; font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+  <header>
+    <h1>🔐 AES-256-GCM</h1>
+    <p>本地加密 · 无网络传输 · 密文自包含</p>
+  </header>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="dot"></span>明文</div>
+      <div class="char-count" id="plainCount">0 字</div>
+    </div>
+    <textarea id="plain" placeholder="在这里输入要加密的内容…" spellcheck="false">这是一段需要保护的信息。</textarea>
+  </div>
+
+  <div class="actions">
+    <button class="btn primary" id="encBtn">🔒 加密</button>
+    <button class="btn secondary" id="decBtn">🔓 解密</button>
+    <button class="btn ghost" id="clearBtn">🗑 清空</button>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="dot green"></span>密文</div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <span class="char-count" id="cipherCount">0 字</span>
+        <button class="mini-btn" id="copyBtn">复制</button>
+        <button class="mini-btn" id="pasteBtn">粘贴</button>
+      </div>
+    </div>
+    <textarea id="cipher" placeholder="加密结果会出现在这里；解密时把密文粘贴到这里…" spellcheck="false"></textarea>
+  </div>
+
+  <div id="status"></div>
+
+  <footer>纯前端运行 · 数据不离开你的设备</footer>
+
+<script>
+/* ============================================================
+   纯 JS AES-256-GCM 实现
+   ============================================================ */
+(function(){
+'use strict';
+
+function bytesToB64(b){let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);return btoa(s);}
+function b64ToBytes(s){const bin=atob(s);const b=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)b[i]=bin.charCodeAt(i);return b;}
+
+function randomBytes(n){
+  const b=new Uint8Array(n);
+  if (typeof crypto!=='undefined' && crypto.getRandomValues) crypto.getRandomValues(b);
+  else for (let i=0;i<n;i++) b[i]=Math.floor(Math.random()*256);
+  return b;
+}
+
+function sha256(msgBytes){
+  const K=[
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ];
+  let H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  function rotr(x,n){return (x>>>n)|(x<<(32-n));}
+  const len=msgBytes.length, bitLen=len*8;
+  let withOne=len+1;
+  let padLen=(withOne%64<=56)?(56-withOne%64):(120-withOne%64);
+  const total=withOne+padLen+8;
+  const buf=new Uint8Array(total);
+  buf.set(msgBytes,0); buf[len]=0x80;
+  const hi=Math.floor(bitLen/0x100000000), lo=bitLen>>>0;
+  buf[total-8]=(hi>>>24)&0xff;buf[total-7]=(hi>>>16)&0xff;
+  buf[total-6]=(hi>>>8)&0xff;buf[total-5]=hi&0xff;
+  buf[total-4]=(lo>>>24)&0xff;buf[total-3]=(lo>>>16)&0xff;
+  buf[total-2]=(lo>>>8)&0xff;buf[total-1]=lo&0xff;
+  const w=new Uint32Array(64);
+  for (let off=0;off<total;off+=64){
+    for (let i=0;i<16;i++)
+      w[i]=(buf[off+i*4]<<24)|(buf[off+i*4+1]<<16)|(buf[off+i*4+2]<<8)|buf[off+i*4+3];
+    for (let i=16;i<64;i++){
+      const s0=rotr(w[i-15],7)^rotr(w[i-15],18)^(w[i-15]>>>3);
+      const s1=rotr(w[i-2],17)^rotr(w[i-2],19)^(w[i-2]>>>10);
+      w[i]=(w[i-16]+s0+w[i-7]+s1)>>>0;
+    }
+    let [a,b,c,d,e,f,g,h]=H;
+    for (let i=0;i<64;i++){
+      const S1=rotr(e,6)^rotr(e,11)^rotr(e,25);
+      const ch=(e&f)^((~e)&g);
+      const t1=(h+S1+ch+K[i]+w[i])>>>0;
+      const S0=rotr(a,2)^rotr(a,13)^rotr(a,22);
+      const maj=(a&b)^(a&c)^(b&c);
+      const t2=(S0+maj)>>>0;
+      h=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0;
+    }
+    H[0]=(H[0]+a)>>>0;H[1]=(H[1]+b)>>>0;H[2]=(H[2]+c)>>>0;H[3]=(H[3]+d)>>>0;
+    H[4]=(H[4]+e)>>>0;H[5]=(H[5]+f)>>>0;H[6]=(H[6]+g)>>>0;H[7]=(H[7]+h)>>>0;
+  }
+  const out=new Uint8Array(32);
+  for (let i=0;i<8;i++){
+    out[i*4]=(H[i]>>>24)&0xff;out[i*4+1]=(H[i]>>>16)&0xff;
+    out[i*4+2]=(H[i]>>>8)&0xff;out[i*4+3]=H[i]&0xff;
+  }
+  return out;
+}
+
+function hmacSha256(keyBytes,msgBytes){
+  const block=64;
+  let k=new Uint8Array(block);
+  if (keyBytes.length>block) k.set(sha256(keyBytes),0);
+  else k.set(keyBytes,0);
+  const o=new Uint8Array(block), i=new Uint8Array(block);
+  for (let n=0;n<block;n++){ o[n]=k[n]^0x5c; i[n]=k[n]^0x36; }
+  const inner=new Uint8Array(block+msgBytes.length);
+  inner.set(i,0); inner.set(msgBytes,block);
+  const innerHash=sha256(inner);
+  const outer=new Uint8Array(block+32);
+  outer.set(o,0); outer.set(innerHash,block);
+  return sha256(outer);
+}
+
+function pbkdf2Sha256(passwordBytes,saltBytes,iterations,dkLen){
+  const hLen=32, blocks=Math.ceil(dkLen/hLen);
+  const dk=new Uint8Array(blocks*hLen);
+  for (let b=1;b<=blocks;b++){
+    const saltBlock=new Uint8Array(saltBytes.length+4);
+    saltBlock.set(saltBytes,0);
+    saltBlock[saltBytes.length]=(b>>>24)&0xff;
+    saltBlock[saltBytes.length+1]=(b>>>16)&0xff;
+    saltBlock[saltBytes.length+2]=(b>>>8)&0xff;
+    saltBlock[saltBytes.length+3]=b&0xff;
+    let u=hmacSha256(passwordBytes,saltBlock);
+    const t=new Uint8Array(u);
+    for (let i=1;i<iterations;i++){
+      u=hmacSha256(passwordBytes,u);
+      for (let j=0;j<hLen;j++) t[j]^=u[j];
+    }
+    dk.set(t,(b-1)*hLen);
+  }
+  return dk.slice(0,dkLen);
+}
+
+const SBOX=new Uint8Array(256);
+(function(){
+  let p=1,q=1;
+  do{
+    p=p^(p<<1)^((p&0x80)?0x1b:0);p&=0xff;
+    q^=q<<1;q^=q<<2;q^=q<<4;q&=0xff;
+    if (q&0x80) q^=0x09;
+    const x=q^(q<<1)^(q<<2)^(q<<3)^(q<<4);
+    SBOX[p]=(x^0x63)&0xff;
+  }while(p!==1);
+  SBOX[0]=0x63;
+})();
+const RCON=[0x00,0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80,0x1b,0x36];
+function xtime(x){return ((x<<1)^((x&0x80)?0x1b:0))&0xff;}
+function aesKeyExpansion(key){
+  const Nk=8,Nr=14;
+  const w=new Array(4*(Nr+1));
+  for (let i=0;i<Nk;i++) w[i]=[key[4*i],key[4*i+1],key[4*i+2],key[4*i+3]];
+  for (let i=Nk;i<4*(Nr+1);i++){
+    let temp=w[i-1].slice();
+    if (i%Nk===0){
+      temp=[temp[1],temp[2],temp[3],temp[0]];
+      temp=temp.map(x=>SBOX[x]);
+      temp[0]^=RCON[i/Nk];
+    } else if (Nk>6 && i%Nk===4){ temp=temp.map(x=>SBOX[x]); }
+    w[i]=[w[i-Nk][0]^temp[0],w[i-Nk][1]^temp[1],w[i-Nk][2]^temp[2],w[i-Nk][3]^temp[3]];
+  }
+  return {w,Nr};
+}
+function aesEncryptBlock(keySchedule,block){
+  const {w,Nr}=keySchedule;
+  let s=block.slice();
+  addRoundKey(s,w,0);
+  for (let r=1;r<Nr;r++){ subBytes(s);shiftRows(s);mixColumns(s);addRoundKey(s,w,r); }
+  subBytes(s);shiftRows(s);addRoundKey(s,w,Nr);
+  return s;
+}
+function addRoundKey(s,w,round){
+  for (let c=0;c<4;c++){ const k=w[round*4+c]; s[4*c]^=k[0];s[4*c+1]^=k[1];s[4*c+2]^=k[2];s[4*c+3]^=k[3]; }
+}
+function subBytes(s){ for (let i=0;i<16;i++) s[i]=SBOX[s[i]]; }
+function shiftRows(s){
+  const t=s.slice();
+  for (let r=1;r<4;r++) for (let c=0;c<4;c++) s[4*c+r]=t[4*((c+r)%4)+r];
+}
+function mixColumns(s){
+  for (let c=0;c<4;c++){
+    const a=[s[4*c],s[4*c+1],s[4*c+2],s[4*c+3]];
+    const b=a.map(xtime);
+    s[4*c]  = b[0]^a[1]^b[1]^a[2]^a[3];
+    s[4*c+1]= a[0]^b[1]^a[2]^b[2]^a[3];
+    s[4*c+2]= a[0]^a[1]^b[2]^a[3]^b[3];
+    s[4*c+3]= b[0]^a[1]^a[2]^b[3]^a[3];
+  }
+}
+function ghash(H,X){
+  let Y=new Uint8Array(16);
+  for (let i=0;i<X.length;i+=16){
+    for (let j=0;j<16;j++) Y[j]^=X[i+j];
+    Y=gfMul(Y,H);
+  }
+  return Y;
+}
+function gfMul(X,Y){
+  const Z=new Uint8Array(16),V=Y.slice();
+  for (let i=0;i<128;i++){
+    const byteIdx=i>>3,bit=7-(i&7);
+    if ((X[byteIdx]>>bit)&1) for (let j=0;j<16;j++) Z[j]^=V[j];
+    const lsb=V[15]&1;
+    for (let j=15;j>0;j--) V[j]=(V[j]>>1)|((V[j-1]&1)<<7);
+    V[0]>>=1;
+    if (lsb) V[0]^=0xe1;
+  }
+  return Z;
+}
+function inc32(block){ for (let i=15;i>=12;i--){ block[i]=(block[i]+1)&0xff; if (block[i]!==0) break; } }
+function ctrEncrypt(keySchedule,iv,plaintext){
+  const J0=new Uint8Array(16); J0.set(iv,0); J0[15]=1;
+  const out=new Uint8Array(plaintext.length);
+  const counter=J0.slice();
+  for (let off=0;off<plaintext.length;off+=16){
+    inc32(counter);
+    const keystream=aesEncryptBlock(keySchedule,Array.from(counter));
+    const n=Math.min(16,plaintext.length-off);
+    for (let i=0;i<n;i++) out[off+i]=plaintext[off+i]^keystream[i];
+  }
+  return out;
+}
+function computeTag(keySchedule,iv,ciphertext,aad){
+  const H=aesEncryptBlock(keySchedule,new Array(16).fill(0));
+  const Hbytes=new Uint8Array(H);
+  const aadLen=aad?aad.length:0,cLen=ciphertext.length;
+  const totalLen=Math.ceil(aadLen/16)*16+Math.ceil(cLen/16)*16+16;
+  const X=new Uint8Array(totalLen);
+  let p=0;
+  if (aad){ X.set(aad,0); p=Math.ceil(aadLen/16)*16; }
+  X.set(ciphertext,p); p+=Math.ceil(cLen/16)*16;
+  const dv=new DataView(X.buffer);
+  dv.setUint32(p,Math.floor((aadLen*8)/0x100000000),false);
+  dv.setUint32(p+4,(aadLen*8)>>>0,false);
+  dv.setUint32(p+8,Math.floor((cLen*8)/0x100000000),false);
+  dv.setUint32(p+12,(cLen*8)>>>0,false);
+  const S=ghash(Hbytes,X);
+  const J0=new Uint8Array(16); J0.set(iv,0); J0[15]=1;
+  const ek=aesEncryptBlock(keySchedule,Array.from(J0));
+  const tag=new Uint8Array(16);
+  for (let i=0;i<16;i++) tag[i]=S[i]^ek[i];
+  return tag;
+}
+function aesGcmEncrypt(keyBytes,iv,plaintext,aad){
+  const ks=aesKeyExpansion(keyBytes);
+  const ciphertext=ctrEncrypt(ks,iv,plaintext);
+  const tag=computeTag(ks,iv,ciphertext,aad||new Uint8Array(0));
+  return {ciphertext,tag};
+}
+function aesGcmDecrypt(keyBytes,iv,ciphertext,tag,aad){
+  const ks=aesKeyExpansion(keyBytes);
+  const expected=computeTag(ks,iv,ciphertext,aad||new Uint8Array(0));
+  let ok=expected.length===tag.length;
+  if (ok) for (let i=0;i<tag.length;i++) if (expected[i]!==tag[i]) { ok=false; break; }
+  if (!ok) throw new Error('认证失败');
+  const J0=new Uint8Array(16); J0.set(iv,0); J0[15]=1;
+  const out=new Uint8Array(ciphertext.length);
+  const counter=J0.slice();
+  for (let off=0;off<ciphertext.length;off+=16){
+    inc32(counter);
+    const keystream=aesEncryptBlock(ks,Array.from(counter));
+    const n=Math.min(16,ciphertext.length-off);
+    for (let i=0;i<n;i++) out[off+i]=ciphertext[off+i]^keystream[i];
+  }
+  return out;
+}
+
+const SALT_LEN=16, IV_LEN=12;
+const ITERATIONS=50000;
+const FIXED_PASSWORD = 'LocalAES-Fixed-Key-2026-DoNotShare';
+
+function deriveKey(password, salt){
+  const pwdBytes=new TextEncoder().encode(password);
+  return pbkdf2Sha256(pwdBytes, salt, ITERATIONS, 32);
+}
+
+function encryptText(plain){
+  const salt=randomBytes(SALT_LEN);
+  const iv=randomBytes(IV_LEN);
+  const key=deriveKey(FIXED_PASSWORD, salt);
+  const data=new TextEncoder().encode(plain);
+  const {ciphertext,tag}=aesGcmEncrypt(key,iv,data);
+  const combined=new Uint8Array(SALT_LEN+IV_LEN+ciphertext.length+tag.length);
+  combined.set(salt,0);
+  combined.set(iv,SALT_LEN);
+  combined.set(ciphertext,SALT_LEN+IV_LEN);
+  combined.set(tag,SALT_LEN+IV_LEN+ciphertext.length);
+  return bytesToB64(combined);
+}
+
+function decryptText(b64){
+  const data=b64ToBytes(b64.replace(/\s/g,''));
+  if (data.length < SALT_LEN+IV_LEN+16) throw new Error('密文长度不合法');
+  const salt=data.slice(0,SALT_LEN);
+  const iv=data.slice(SALT_LEN,SALT_LEN+IV_LEN);
+  const tag=data.slice(data.length-16);
+  const ciphertext=data.slice(SALT_LEN+IV_LEN,data.length-16);
+  const key=deriveKey(FIXED_PASSWORD, salt);
+  const plain=aesGcmDecrypt(key,iv,ciphertext,tag);
+  return new TextDecoder().decode(plain);
+}
+
+window.__aes = { encryptText, decryptText };
+})();
+
+/* ============================================================
+   界面逻辑
+   ============================================================ */
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  let statusTimer=null;
+
+  function setStatus(msg,type){
+    const el=$('status');
+    el.textContent=msg;
+    el.className='show '+(type||'info');
+    if (statusTimer) clearTimeout(statusTimer);
+    if (type!=='err') statusTimer=setTimeout(()=>{el.className='';},3000);
+  }
+
+  function updateCounts(){
+    $('plainCount').textContent = $('plain').value.length + ' 字';
+    $('cipherCount').textContent = $('cipher').value.length + ' 字';
+  }
+
+  $('plain').addEventListener('input', updateCounts);
+  $('cipher').addEventListener('input', updateCounts);
+
+  $('encBtn').addEventListener('click',()=>{
+    const plain=$('plain').value;
+    if (!plain){ setStatus('请先输入明文','err'); return; }
+    $('encBtn').disabled=true;
+    setStatus('加密中…','info');
+    setTimeout(()=>{
+      try{
+        $('cipher').value = window.__aes.encryptText(plain);
+        updateCounts();
+        setStatus('加密成功 ✓ 密文已生成','ok');
+      }catch(e){
+        setStatus('加密失败：'+e.message,'err');
+      }finally{ $('encBtn').disabled=false; }
+    },30);
+  });
+
+  $('decBtn').addEventListener('click',()=>{
+    const b64=$('cipher').value.trim();
+    if (!b64){ setStatus('请把密文粘贴到下方密文框','err'); return; }
+    $('decBtn').disabled=true;
+    setStatus('解密中…','info');
+    setTimeout(()=>{
+      try{
+        $('plain').value = window.__aes.decryptText(b64);
+        updateCounts();
+        setStatus('解密成功 ✓ 明文已写回上方','ok');
+      }catch(e){
+        setStatus('解密失败 ✗ 密文无效或被篡改','err');
+      }finally{ $('decBtn').disabled=false; }
+    },30);
+  });
+
+  // 清空：最简版，直接清
+  $('clearBtn').addEventListener('click',()=>{
+    $('plain').value = '';
+    $('cipher').value = '';
+    updateCounts();
+    $('status').className = '';
+    setStatus('已清空 ✓','ok');
+  });
+
+  $('copyBtn').addEventListener('click',()=>{
+    const t=$('cipher').value;
+    if (!t){ setStatus('密文为空','err'); return; }
+    const done = ()=>setStatus('已复制到剪贴板 ✓','ok');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(done, ()=>{
+        $('cipher').select(); document.execCommand('copy'); done();
+      });
+    } else {
+      $('cipher').select(); document.execCommand('copy'); done();
+    }
+  });
+
+  $('pasteBtn').addEventListener('click', async ()=>{
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          $('cipher').value = text;
+          updateCounts();
+          setStatus('已粘贴 ✓','ok');
+        } else {
+          setStatus('剪贴板为空','err');
+        }
+      } else {
+        setStatus('浏览器不支持读取剪贴板，请长按输入框粘贴','err');
+      }
+    } catch (e) {
+      setStatus('无法读取剪贴板，请长按输入框手动粘贴','err');
+    }
+  });
+
+  updateCounts();
+})();
+</script>
+
+</body>
+</html>
